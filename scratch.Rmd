@@ -1,0 +1,11 @@
+---
+title: "Scratch"
+author: "Mason Ogden"
+date: "10/16/2020"
+output: html_document
+---
+
+```{r}
+
+```
+
