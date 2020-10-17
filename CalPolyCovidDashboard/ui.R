@@ -12,7 +12,7 @@ library(shinydashboard)
 
 
 dashboardPage(
-    dashboardHeader(title = "Cal Poly COVID-19\nVisual Dashboard"),
+    dashboardHeader(title = "Cal Poly COVID-19 Visual Dashboard"),
     dashboardSidebar(),
     dashboardBody(
         fluidRow(
