@@ -5,7 +5,149 @@ date: "10/16/2020"
 output: html_document
 ---
 
-```{r}
+### Design Questions:
 
+1. Keep consistent graph color scheme throughout tabs or change with every tab?
+
+2. Styling of date control bar?
+
+### Ideas:
+
+1. green/red indicator buttons with number of new cases today
+
+  + like https://shiny.rstudio.com/gallery/nz-trade-dash.html
+  
+2. 
+
+```{r packages and data warning=FALSE, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(plotly)
+cp_data <- read_csv("cp_dashboard_data.csv") %>%
+  mutate(updated = mdy(updated))
+```
+
+```{r clean cp data}
+cp_ready <- cp_data %>%
+  filter(wday(updated) %in% 2:6, # only keep weekdays (it's only updated on weekdays)
+         updated != "2020-10-13") %>% # we don't have data on this day 
+  mutate(daily_pos_on_campus = c(0, diff(total_pos_on_campus_res)),
+         .after = 'total_pos_on_campus_res') %>%
+  mutate(daily_pos_off_campus = c(0, diff(total_pos_off_campus_res)),
+         .after = 'total_pos_off_campus_res')
+```
+
+
+```{r plot cp data}
+dates <- cp_ready %>%
+  pull(updated)
+
+on_text <- cp_ready %>%
+  pull(daily_pos_on_campus) %>%
+  str_c(" new positive on-campus tests")
+
+off_text <- cp_ready %>%
+  pull(daily_pos_off_campus) %>%
+  str_c(" new positive off-campus tests")
+
+dates_to_show <- c(first(dates), last(dates))
+
+
+cp_ready %>%
+  filter(updated >= dates_to_show[1],
+         updated <= dates_to_show[2]) %>%
+  plot_ly(type = 'bar') %>%
+  add_trace(x = ~updated,
+            y = ~daily_pos_on_campus,
+            name = 'On-Campus',
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$daily_pos_on_campus, " new positive on-campus tests"),
+            hoverinfo = 'text',
+            marker = list(color = '#1b543b')) %>%
+  add_trace(x = ~updated,
+            y = ~daily_pos_off_campus,
+            name = 'Off-Campus',
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$daily_pos_off_campus, " new positive off-campus tests"),
+            hoverinfo = 'text',
+            marker = list(color = '#9c9c80')) %>%
+  layout(title='Cal Poly Daily Positive COVID-19 Cases',
+         yaxis = list(title = 'New Positive Tests'),
+         xaxis = list(title = ''),
+         barmode = 'stack')
+```
+
+```{r}
+cp_ready %>%
+  plot_ly(type = 'scatter', mode = 'markers+lines') %>%
+  add_trace(x = ~updated, 
+            y = ~total_tests_CHW,
+            color = I("#FC766AFF"),
+            name = "Campus Health and Wellbeing (since Jul. 8, 2020)",
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$total_tests_CHW, ' total CHW tests performed'),
+            hoverinfo = 'text') %>%
+  add_trace(x = ~updated,
+            y = ~total_tests_otp,
+            color = I("#5B84B1FF"),
+            name = "Ongoing Testing Program (since Oct. 3, 2020)",
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$total_tests_otp, ' total OTP tests performed'),
+            hoverinfo = 'text') %>%
+  layout(title = "Cal Poly Testing",
+         yaxis = list(range = c(0, 9000),
+                      title = "Total Tests Performed"),
+         xaxis = list(title = ""),
+         legend = list(x = 0.03, y = 0.94))
+```
+
+```{r}
+cp_ready %>%
+  plot_ly(type = 'scatter', mode = 'markers+lines') %>%
+  add_trace(x = ~updated,
+            y = ~total_on_campus_res_iso,
+            name = 'Isolation', 
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$total_on_campus_res_iso, ' total residents in isolation'),
+            hoverinfo = 'text') %>%
+  add_trace(x = ~updated,
+            y = ~total_on_campus_res_quar,
+            name = 'Quarantine', 
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$total_on_campus_res_quar, ' total residents in isolation'),
+            hoverinfo = 'text') %>%
+  layout(title = "Total On-Campus Resident Students in Isolation/Quarantine",
+         yaxis = list(title = "Number of Residents"),
+         xaxis = list(title = ''),
+         legend = list(x = 0.03, y = 0.94))
+```
+
+```{r}
+cp_ready %>%
+  plot_ly(type = 'scatter', mode = 'markers+lines') %>%
+  add_trace(x = ~updated,
+            y = ~total_on_quar_current_quar_in_place,
+            text = str_c(strftime(cp_ready$updated, format="%b %d, %Y"), ':\n', cp_ready$total_on_quar_current_quar_in_place, ' total resident students'),
+            hoverinfo = 'text') %>%
+  layout(title = "Total On-Campus Resident Students Currenly in Quarantine in Place",
+         showlegend=FALSE,
+         xaxis = list(title = ''),
+         yaxis = list(title = 'Number of Resident Students',
+                      range = c(0, 350)))
+```
+
+```{r}
+pie_data <- cp_ready %>%
+  select(total_pos_on_campus_res, total_pos_off_campus_res) %>%
+  slice_tail() %>%
+  pivot_longer(cols = c(total_pos_on_campus_res, total_pos_off_campus_res)) %>%
+  rename(location = name, num_cases = value) %>%
+  add_column(location_formatted = c("On-campus", "Off-campus"),
+             .after = 'location')
+
+pie_data %>%
+  plot_ly(labels = ~location_formatted, values = ~num_cases,
+          marker = list(colors = c('#1b543b', '#9c9c80'))) %>%
+  add_pie(hole = 0.4,
+          text = str_c(pie_data$location_formatted, ': ', pie_data$num_cases),
+          hoverinfo = 'text') %>%
+  layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         showlegend = FALSE) %>%
+  config(displaylogo = FALSE)
 ```
 
