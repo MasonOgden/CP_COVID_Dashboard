@@ -1,0 +1,197 @@
+---
+title: "Scraping"
+author: "Mason Ogden"
+date: "10/29/2020"
+output: html_document
+---
+
+```{r message = FALSE, warning = FALSE}
+library(tidyverse)
+library(rvest)
+library(lubridate)
+library(purrr)
+```
+
+```{r message = FALSE}
+df <- read_csv("cp_dashboard_data.csv") %>%
+  mutate(updated = mdy(updated)) %>% # convert date to date object
+  filter(wday(updated) %in% 2:6, # keep only weekdays
+         updated != "2020-10-13") %>% # we don't have data on this day
+  append_new_data('html_files')
+```
+
+
+```{r functions}
+get_unused_html_names <- function(html_directory, current_data) {
+  
+  file_names <- list.files(paste0(getwd(), '/', html_directory))
+  
+  file_dates <- file_names %>%
+    str_extract(pattern = r'(\w{3}_\d{1,2})') %>%
+    str_replace('_', ' ') %>%
+    str_c(', 2020') %>%
+    mdy()
+  
+  file_df <- data.frame(file_dates, file_names)
+
+
+  recent_data_date <- current_data %>%
+    slice_tail() %>%
+    pull(updated)
+  
+  unused_file_names <- file_df %>% 
+    filter(file_dates > recent_data_date) %>%
+    pull(file_names)
+  if (length(unused_file_names) == 0) { # if there aren't any new file names
+    return(NA)
+  } else {
+    str_c(html_directory, '/', unused_file_names)
+  }
+}
+
+get_testing_table_info <- function(testing_table) {
+  if (nrow(testing_table) == 11) {  # if they haven't changed the tables
+    testing_table %>%
+      pull(num) %>%
+      str_remove_all(',') %>%
+      as.numeric() %>%
+      return()
+
+  } else {
+    testing_table %>%
+      extract_testing_table_info() %>%
+      return()
+  }
+}
+
+get_iso_table_info <- function(isolation_table) {
+  if (nrow(isolation_table) == 3) {  # if they haven't changed the tables
+    isolation_table %>%
+      pull(num) %>%
+      str_remove_all(',') %>%
+      as.numeric() %>%
+      return()
+    
+  } else {
+    isolation_table %>%
+      extract_iso_table_info() %>%
+      return()
+  }
+}
+
+get_quar_table_info <- function(quar_table) {
+  if (nrow(quar_table) == 2) {
+    quar_table %>%
+      pull(num) %>%
+      str_remove_all(',') %>%
+      as.numeric() %>%
+      return()
+    
+  } else {
+    quar_table %>%
+      extract_quar_table_info() %>%
+      return()
+  }
+}
+
+get_qip_table_info <- function(qip_table) {
+  if (nrow(qip_table) == 2) {
+    qip_table %>%
+      pull(num) %>%
+      str_remove_all(',') %>%
+      as.numeric() %>%
+      return()
+    
+  } else {
+    qip_table %>%
+      extract_qip_table_info() %>%
+      return()
+  }
+}
+
+extract_testing_table_info <- function(testing_table) {
+  rep(NA, 11) %>%
+    return()
+}
+
+extract_iso_table_info <- function(isolation_table) {
+  rep(NA, 3) %>%
+    return()
+}
+
+extract_quar_table_info <- function(quar_table) {
+  rep(NA, 2) %>%
+    return()
+}
+
+extract_qip_table_info <- function(qip_table) {
+  rep(NA, 2) %>%
+    return()
+}
+
+get_new_row <- function(unused_file) {
+  
+  #browser()
+  
+  updated <- unused_file %>%
+    str_extract(pattern = r'(\w{3}_\d{1,2})') %>%
+    str_replace('_', ' ') %>%
+    str_c(', 2020') %>%
+    mdy()
+  
+  my_html <- read_html(unused_file)
+
+  html_tables <- my_html %>%
+    html_nodes('table')
+  
+  testing_nums <- html_tables %>%
+    .[[1]] %>%
+    html_table() %>%
+    rename(name = X1, num = X2) %>%
+    get_testing_table_info()
+  
+  isolation_nums <- html_tables %>%
+    .[[2]] %>%
+    html_table() %>%
+    rename(name = X1, num = X2) %>%
+    get_iso_table_info()
+  
+  quar_nums <- html_tables %>%
+    .[[3]] %>%
+    html_table() %>%
+    rename(name = X1, num = X2) %>%
+    get_quar_table_info()
+  
+  qip_nums <- html_tables %>%
+    .[[4]] %>%
+    html_table() %>%
+    rename(name = X1, num = X2) %>%
+    get_qip_table_info()
+  
+  numerics <- c(testing_nums, isolation_nums, quar_nums, qip_nums)
+  data.frame(updated = updated, total_tests_CHW = numerics[1], total_tests_empl_otp = numerics[2], total_tests_otp = numerics[3], total_tests_CHW_past_72 = numerics[4],
+       total_pos_on_campus_res = numerics[5], new_pos_on_campus_res_past_72 = numerics[6], total_pos_off_campus_res = numerics[7],
+       new_pos_off_campus_res_past_72 = numerics[8], total_recov_on_campus_res = numerics[9], new_recov_on_campus_res_past_72 = numerics[10],
+       current_hosp_on_campus_res = numerics[11], total_on_campus_res_iso = numerics[12], new_on_campus_res_iso_past_72 = numerics[13],
+       remaining_iso_beds = numerics[14], total_on_campus_res_quar = numerics[15], new_on_campus_res_quar_past_72 = numerics[16],
+       total_on_quar_current_quar_in_place = numerics[17], new_on_campus_quar_in_place_past_72 = numerics[18])
+}
+
+append_new_data <- function(current_data, html_directory) {
+  #browser()
+  
+  new_files <- html_directory %>%
+    get_unused_html_names(current_data)
+  
+  if (is.na(new_files)) { # if there aren't any new file names to add to our data
+    return(current_data)
+  } else {
+    new_data <- new_files %>%
+      map_df(get_new_row)
+    
+    rbind(current_data, new_data) %>%
+      return()
+  }
+}
+```
+

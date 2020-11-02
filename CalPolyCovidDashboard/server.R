@@ -7,6 +7,11 @@
 #    http://shiny.rstudio.com/
 #
 
+# font problems: https://stackoverflow.com/questions/55100069/ggplot-with-customized-font-not-showing-properly-on-shinyapps-io
+#                https://community.rstudio.com/t/loading-custom-fonts-into-shinyapps/61168
+
+# looks like you have to keep fonts in the www directory to eventually so that they load when it gets deployed.
+
 library(shiny)
 library(tidyverse)
 library(plotly)
@@ -18,11 +23,34 @@ round_up_nearest <- function(num) {
     ceiling(num / divisor) * divisor
 }
 
-cp_ready <- read_csv("cp_dashboard_data.csv") %>%
-    mutate(updated = mdy(updated)) %>%
-    filter(wday(updated) %in% 2:6, # only keep weekdays (it's only updated on weekdays)
-           updated != "2020-10-13") %>% # we don't have data on this day 
-    mutate(daily_pos_on_campus = c(0, diff(total_pos_on_campus_res)),
+print("got here")
+cp_updated <- read_csv("cp_dashboard_data.csv",
+                       col_types = list(col_character(), col_double(), col_double(),
+                                        col_double(), col_double(), col_double(),
+                                        col_double(), col_double(), col_double(),
+                                        col_double(), col_double(), col_double(),
+                                        col_double(), col_double(), col_double(),
+                                        col_double(), col_double(), col_double(),
+                                        col_double())) %>%
+    mutate(updated = ymd(updated)) %>%
+    append_new_data('html_files')
+
+#write.csv(cp_updated, file=paste0(getwd(), '/cp_dashboard_data.csv'), row.names=FALSE)
+#write.csv(cp_updated, file=paste0(getwd(), '/CalPolyCovidDashboard/cp_dashboard_data.csv'))
+    
+
+cp_ready <- read_csv("cp_dashboard_data.csv",
+                     col_types = list(col_character(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double())) %>% # read in the new data
+    filter(wday(updated) %in% 2:6, # keep only weekdays
+           updated != "2020-10-13") %>% # we don't have data on this day
+    mutate(updated = ymd(updated),
+           daily_pos_on_campus = c(0, diff(total_pos_on_campus_res)),
            .after = 'total_pos_on_campus_res') %>%
     mutate(daily_pos_off_campus = c(0, diff(total_pos_off_campus_res)),
            .after = 'total_pos_off_campus_res')
@@ -38,40 +66,74 @@ shinyServer(function(input, output) {
     
     activate <- 3
     
+    # eventExpr = 'shiny:connected'
+    
     observeEvent(once = TRUE, ignoreInit = FALSE, eventExpr = 'shiny:connected', {
         # event will be called when activate changes, which is only once, when it is initially assigned
         showModal(modalDialog(
-            box(title = p(h2('Welcome to the Cal Poly COVID-19 Visual Dashboard', style = 'font-family: Utopia; text-align: center'),
+            box(title = p(h2('Welcome to the Cal Poly COVID-19 Visual Dashboard', style = 'font-family: "Abolition W00 Regular"; text-align: center'),
                              br(),
-                             h4('Updated October 16th, 4:30 PM', style = 'font-family: Utopia; text-align: center')),
+                             h4(textOutput('today_formatted'), style = 'font-family: Utopia; text-align: center')),
                 width = '100%'),
             tags$img(src='cp_official2_wide2.jpg', style="display: block; margin-left: auto; margin-right: auto",
                      width = '100%',
                      height = '100%'),
             br(),
             fluidRow(
-                valueBox(20, p("New Positive Tests", br(), br(), style = 'line-height: 0.01cm'), icon = icon("chart-line"), color = 'red', width = 2),
-                valueBox(10000, "Total Tests Performed", icon = icon("plus-square"), color = 'green', width = 2),
-                valueBox(10, p("Students Currently",
-                          br(),
-                          p("in Isolation"),
-                          style = 'line-height: 0.01cm'), icon = icon('hourglass-end'), color = 'yellow', width = 2),
-                valueBox(10, p("Students Currently",
-                          br(),
-                          p("in Quarantine"),
-                          style = 'line-height: 0.01cm'), icon = icon('exclamation-triangle'), color = 'orange', width = 2),
-                valueBox(234, p("Residents Quarantined" ,
-                          br(),
-                          p("in Place"),
-                          style = 'line-height: 0.01cm'), icon = icon('house-user'), color = 'purple', width = 2),
-                valueBox(0, p("Residents Currently",
-                          br(),
-                          p("Hospitalized"),
-                          style = 'line-height: 0.01cm'), icon = icon('ambulance'), color = 'maroon', width = 2)
+                box(width=1),
+                column(p("New Positive Student Tests", style='color: #ffffff;'),
+                       h3(textOutput("new_positive"), style='color: #ffffff;'),
+                       width = 2,
+                       style = "background-color:#154734; border-right: 3px solid white; border-left: 3px solid white;"),
+                column(p("Total Tests Performed", style='color: #ffffff;'),
+                       h3(textOutput("total_tests"), style='color: #ffffff;'),
+                       width=2,
+                       style = "background-color:#154734; border-right: 3px solid white; border-left: 3px solid white;"),
+                column(p("Students Currently in Isolation", style='color: #ffffff;'),
+                       h3(textOutput("stud_in_isolation"), style='color: #ffffff;'),
+                       width = 2,
+                       style = "background-color:#154734; border-right: 3px solid white; border-left: 3px solid white;"),
+                column(p("Students Currently in Quarantine", style='color: #ffffff;'),
+                       h3(textOutput("stud_in_quarantine"), style='color: #ffffff;'),
+                       width = 2,
+                       style = "background-color:#154734; border-right: 3px solid white; border-left: 3px solid white;"),
+                column(p("Residents Currently Quarantined in Place", style='color: #ffffff;'),
+                       h3(textOutput("stud_qip"), style='color: #ffffff;'),
+                       width = 2,
+                       style = "background-color:#154734; border-right: 3px solid white; border-left: 3px solid white;"),
+                box(width = 1)
             )#,
             #h4('Created by Mason Ogden and Sydney Ozawa', style = 'text-align: center')
         ))
     })
+    # Text outputs for landing page
+    
+    today_row <- cp_ready %>%
+        slice_tail()
+    
+    output$today_formatted <- renderText({today_row %>%
+            pull(updated) %>%
+            strftime(format = "Updated %B %d, %Y")})
+    
+    output$new_positive <- renderText({today_row %>%
+            select(daily_pos_on_campus, daily_pos_off_campus) %>%
+            mutate(new_pos_students = daily_pos_on_campus + daily_pos_off_campus) %>%
+            pull(new_pos_students)})
+    
+    output$total_tests <- renderText({today_row %>%
+            select(total_tests_CHW, total_tests_empl_otp, total_tests_otp) %>%
+            mutate(total_tests = total_tests_CHW + total_tests_empl_otp + total_tests_otp) %>%
+            pull(total_tests)})
+    
+    output$stud_in_isolation <- renderText({today_row %>%
+            pull(total_on_campus_res_iso)})
+    
+    output$stud_in_quarantine <- renderText({today_row %>%
+            pull(total_on_campus_res_quar)})
+    
+    output$stud_qip <- renderText({today_row %>%
+            pull(total_on_quar_current_quar_in_place)})
+        
     
     dates_to_show <- reactive({
         input$date_slider
@@ -192,7 +254,7 @@ shinyServer(function(input, output) {
                   text = str_c(strftime(plot_data3()$updated, format="%b %d, %Y"), ':\n', plot_data3()$total_on_campus_res_quar, ' total resident students in isolation'),
                   hoverinfo = 'text') %>%
         layout(yaxis = list(title = "Number of Resident Students",
-                            range = c(0, y_max_rounded2())),
+                            range = c(0, y_max_rounded2() + 2)),
                xaxis = list(title = ''),
                legend = list(x = 0.03, y = 0.94),
                font = font_settings) %>%

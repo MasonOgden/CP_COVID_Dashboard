@@ -118,10 +118,17 @@ customTheme <- shinyDashboardThemeDIY(
     
 )
 
-cp_ready <- read_csv("cp_dashboard_data.csv") %>%
-    mutate(updated = mdy(updated)) %>%
-    filter(wday(updated) %in% 2:6, # only keep weekdays (it's only updated on weekdays)
-           updated != "2020-10-13")
+cp_ready <- read_csv("cp_dashboard_data.csv",
+                     col_types = list(col_character(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double(), col_double(), col_double(),
+                                      col_double())) %>% # read in the new data
+    filter(wday(updated) %in% 2:6, # keep only weekdays
+           updated != "2020-10-13") %>% # we don't have data on this day
+    mutate(updated = ymd(updated))
 
 dates <- cp_ready %>%
     pull(updated)

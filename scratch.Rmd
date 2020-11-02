@@ -19,7 +19,7 @@ output: html_document
   
 2. 
 
-```{r packages and data warning=FALSE, message=FALSE}
+```{r warning=FALSE, message=FALSE}
 library(tidyverse)
 library(lubridate)
 library(plotly)
@@ -28,13 +28,44 @@ cp_data <- read_csv("cp_dashboard_data.csv") %>%
 ```
 
 ```{r clean cp data}
-cp_ready <- cp_data %>%
-  filter(wday(updated) %in% 2:6, # only keep weekdays (it's only updated on weekdays)
-         updated != "2020-10-13") %>% # we don't have data on this day 
+cp_ready <- cp_data %>% # convert date to date object
+  filter(wday(updated) %in% 2:6, # keep only weekdays
+         updated != "2020-10-13") %>% # we don't have data on this day
+  append_new_data('html_files') %>%
   mutate(daily_pos_on_campus = c(0, diff(total_pos_on_campus_res)),
          .after = 'total_pos_on_campus_res') %>%
   mutate(daily_pos_off_campus = c(0, diff(total_pos_off_campus_res)),
          .after = 'total_pos_off_campus_res')
+```
+
+```{r}
+# landing page stats
+
+today_row <- cp_ready %>%
+  slice_tail()
+
+today_row %>%
+  select(daily_pos_on_campus, daily_pos_off_campus) %>%
+  mutate(new_pos_students = daily_pos_on_campus + daily_pos_off_campus) %>%
+  pull(new_pos_students)
+
+today_row %>%
+  select(total_tests_CHW, total_tests_otp) %>%
+  mutate(total_tests = total_tests_CHW + total_tests_otp) %>%
+  pull(total_tests)
+
+today_row %>%
+  pull(total_on_campus_res_iso)
+
+today_row %>%
+  pull(total_on_campus_res_quar)
+
+today_row %>%
+  pull(total_on_quar_current_quar_in_place)
+
+today_row %>%
+  pull(updated) %>%
+  strftime(format = "Updated %B %d, %Y")
 ```
 
 
