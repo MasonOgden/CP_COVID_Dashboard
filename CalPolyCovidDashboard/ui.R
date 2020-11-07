@@ -1,19 +1,16 @@
-#
-# This is the user-interface definition of a Shiny web application. You can
-# run the application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-# first-aid
 
+
+#--------------------Packages--------------------#
 library(shiny)
 library(plotly)
 library(tidyverse)
 library(lubridate)
 library(shinydashboard)
 library(dashboardthemes)
+
+
+#--------------------Defining Page CSS-----------#
+
 
 ### creating custom theme object
 customTheme <- shinyDashboardThemeDIY(
@@ -118,14 +115,10 @@ customTheme <- shinyDashboardThemeDIY(
     
 )
 
-cp_ready <- read_csv("cp_dashboard_data.csv",
-                     col_types = list(col_character(), col_double(), col_double(),
-                                      col_double(), col_double(), col_double(),
-                                      col_double(), col_double(), col_double(),
-                                      col_double(), col_double(), col_double(),
-                                      col_double(), col_double(), col_double(),
-                                      col_double(), col_double(), col_double(),
-                                      col_double())) %>% # read in the new data
+#--------------------Reading Data for needed for Input Slider Range--------------------#
+
+
+cp_ready <- drop_read_csv('/mn_html_files/cp_dashboard_data.csv') %>% # read in the new data
     filter(wday(updated) %in% 2:6, # keep only weekdays
            updated != "2020-10-13") %>% # we don't have data on this day
     mutate(updated = ymd(updated))
@@ -137,7 +130,8 @@ qip_begin_index <- min(which(!is.na(cp_ready$total_on_quar_current_quar_in_place
 
 
 
-# Cal Poly COVID-19 Visual Dashboard
+#--------------------User Interface--------------------#
+
 dashboardPage(
     dashboardHeader(title = span("Cal Poly COVID-19 Visual Dashboard", style = "color: white; font-family: Utopia; font-size: 22px"),
                     titleWidth = 375),

@@ -10,19 +10,23 @@ library(tidyverse)
 library(rvest)
 library(lubridate)
 library(purrr)
+library(rdrop2)
+library(magrittr)
 ```
 
 ```{r message = FALSE}
 df <- read_csv("cp_dashboard_data.csv") %>%
-  mutate(updated = mdy(updated)) %>% # convert date to date object
+  mutate(updated = ymd(updated)) %>% # convert date to date object
   filter(wday(updated) %in% 2:6, # keep only weekdays
          updated != "2020-10-13") %>% # we don't have data on this day
-  append_new_data('html_files')
+  append_new_data('html_files') %T>%
+  write.csv("cp_dashboard_data.csv", row.names=FALSE)
 ```
 
 
 ```{r functions}
 get_unused_html_names <- function(html_directory, current_data) {
+  #browser()
   
   file_names <- list.files(paste0(getwd(), '/', html_directory))
   
@@ -41,7 +45,9 @@ get_unused_html_names <- function(html_directory, current_data) {
   
   unused_file_names <- file_df %>% 
     filter(file_dates > recent_data_date) %>%
+    arrange(file_dates) %>%
     pull(file_names)
+    
   if (length(unused_file_names) == 0) { # if there aren't any new file names
     return(NA)
   } else {
@@ -110,28 +116,37 @@ get_qip_table_info <- function(qip_table) {
 }
 
 extract_testing_table_info <- function(testing_table) {
-  rep(NA, 11) %>%
-    return()
+  c('total student tests from ongoing testing program', 'total employee tests from ongoing testing program',
+    'total tests performed by campus health and wellbeing', 'chw in prior weekday', 'total positive tests of on-campus',
+    'new positive tests of on-campus', 'total positive tests of off-campus', 'new positive tests of off-campus',
+    'total recovered cases for on-campus', 'new recovered cases for on-campus', 'currently hospitalized') %>%
+  map_dbl(~extract_associated_number(testing_table, .x))
 }
 
 extract_iso_table_info <- function(isolation_table) {
-  rep(NA, 3) %>%
-    return()
+  c('total on-campus resident', 'new on-campus resident', 'remaining') %>%
+  map_dbl(~extract_associated_number(isolation_table, .x))
 }
 
 extract_quar_table_info <- function(quar_table) {
-  rep(NA, 2) %>%
-    return()
+  c('total', 'new') %>%
+    map_dbl(~extract_associated_number(quar_table, .x))
 }
 
 extract_qip_table_info <- function(qip_table) {
-  rep(NA, 2) %>%
-    return()
+  c('total', 'new') %>%
+    map_dbl(~extract_associated_number(qip_table, .x))
+}
+
+extract_associated_number <- function(this_table, pattern) {
+  this_table %>%
+    filter(str_detect(str_to_lower(name), pattern)) %>% 
+    pull(num) %>%
+    str_remove_all(pattern=',') %>%
+    as.numeric()
 }
 
 get_new_row <- function(unused_file) {
-  
-  #browser()
   
   updated <- unused_file %>%
     str_extract(pattern = r'(\w{3}_\d{1,2})') %>%
@@ -193,5 +208,14 @@ append_new_data <- function(current_data, html_directory) {
       return()
   }
 }
+```
+
+```{r}
+token <- drop_auth()
+drop_dir(dtoken = token) %>%
+  filter(.tag == 'folder')
+
+# the below line works
+test <- drop_read_csv('/mn_html_files/cp_dashboard_data.csv')
 ```
 
